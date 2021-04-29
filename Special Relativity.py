@@ -640,10 +640,10 @@ def main():
     # test5()
 
     # Test 6: Electrostatic force
-    test6()
+    # test6()
 
     # Test 7: Moving line of charge
-    # test7()
+    test7()
 
 
 def test1():
@@ -852,7 +852,6 @@ def test6():
     sim.plot()
 
 
-# TODO: Add moving line of charge example
 def test7():
     """A moving line of charge with non-instantaneous forces"""
     # Declare function for the forces
@@ -914,10 +913,10 @@ def test7():
         return fx, fy
 
     # Declare simulation
-    sim = Simulation(0.01, 10, forces, c=10.0)
+    sim = Simulation(0.01, 20, forces, c=15.0)
 
     # Spawn line of moving charge
-    for x_pos in np.arange(-500.0, 500.0, 10.0):
+    for x_pos in np.linspace(-500.0, 500.0, 15):
         sim.add_point(x_pos, -50.0, 0.9*sim.c, 0.0, 1.0, -1.0)
 
     # Spawn test charge near the line
@@ -928,6 +927,9 @@ def test7():
 
     # Show the results
     sim.show()
+
+    # Show a plot of the results
+    sim.plot()
 
 
 # Run main program
