@@ -409,6 +409,17 @@ class Simulation:
                 # Draw circle to represent the particle
                 pygame.draw.circle(self.window, color, win_center + (int(px), int(py)), 10)
 
+                # Draw charge indicator
+                if self.charge[i] != 0.0:
+                    # Draw minus sign if the charge is non-zero
+                    pygame.draw.line(self.window, (0, 0, 0),
+                                     (win_center+(int(px)-5, int(py))), (win_center+(int(px)+5, int(py))))
+
+                if self.charge[i] > 0.0:
+                    # Add another line to turn the minus into a plus, if applicable
+                    pygame.draw.line(self.window, (0, 0, 0),
+                                     (win_center + (int(px), int(py)-5)), (win_center + (int(px), int(py)+5)))
+
         # Draw polygons
         for polygon in self.polygons:
             # Obtain coordinates of the points in the polygon
@@ -461,7 +472,7 @@ class Simulation:
             ruler_text = self.font.render(f"Ruler: -", 12, (255, 255, 255))
         self.window.blit(ruler_text, (10, 90))
 
-    def run(self, method='euler'):
+    def run(self, method='rk4', print_progress=False):
         """Runs the simulation"""
         # Record initial positions to history
         self.x_history.append(self.x)
@@ -482,6 +493,11 @@ class Simulation:
         while self.time[-1] < self.t_max:
             # Run the physics calculations
             sim_func()
+
+            # Print the current progress, if applicable
+            if print_progress:
+                if not len(self.time) % 10:
+                    print(f"Time: {self.time[-1]} / {self.t_max}")
 
     def show(self, t_start=0.0, t_stop=None, max_fps=90):
         """Shows an interactive window of the simulation's results"""
@@ -637,13 +653,13 @@ def main():
     # test4()
 
     # Test 5: Constant force
-    # test5()
+    test5()
 
     # Test 6: Electrostatic force
     # test6()
 
     # Test 7: Moving line of charge
-    test7()
+    # test7()
 
 
 def test1():
@@ -832,7 +848,7 @@ def test6():
         return fx, fy
 
     # Declare simulation
-    sim = Simulation(0.01, 10, forces, c=10.0)
+    sim = Simulation(0.01, 20, forces, c=10.0)
 
     # Spawn particles
     v_max = sim.c / np.sqrt(2)
@@ -913,7 +929,7 @@ def test7():
         return fx, fy
 
     # Declare simulation
-    sim = Simulation(0.01, 20, forces, c=15.0)
+    sim = Simulation(0.01, 20, forces, c=20.0)
 
     # Spawn line of moving charge
     for x_pos in np.linspace(-500.0, 500.0, 15):
@@ -923,7 +939,7 @@ def test7():
     sim.add_point(0.0, 50.0, 0.0, 0.0, 1.0, -1.0)
 
     # Run the simulation
-    sim.run()
+    sim.run(print_progress=True)
 
     # Show the results
     sim.show()
