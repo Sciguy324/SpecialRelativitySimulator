@@ -789,99 +789,6 @@ def test6():
         present_time = t[-1]
 
         for i, (xi, yi) in enumerate(zip(x[-1], y[-1])):
-            for j, (xj, yj) in enumerate(zip(x_histories, y_histories)):
-                # xi: Present x-position of object i.
-                # yi: Present y-position of object i.
-                # xj: x-data for the worldline of object j.  Indexed array
-                # yj: y-data for the worldline of object j.  Indexed array
-
-                # Don't compute force between self and self
-                if i == j:
-                    continue
-
-                # Compute space-time interval
-                s_squared = sim.c**2 * (present_time - t_history)**2 - (xi - xj)**2 - (yi - yj)**2
-
-                # Find the zero-interval
-                zero_index = np.argmin(np.abs(s_squared))
-
-                # DEBUGGING: Show this graphically
-                if round(present_time, 3) % 0.5 <= sim.base_dt/5 and i == 0 and present_time > 2.0 and False:
-                    # Set up the plot
-                    fig = plt.figure()
-                    ax = fig.add_subplot(projection='3d')
-
-                    # Plot worldlines
-                    for worldline_x, worldline_y in zip(x_histories, y_histories):
-                        ax.plot(worldline_x, worldline_y, t_history)
-
-                    # Plot the present particle
-                    ax.scatter(xi, yi, present_time, c='blue')
-
-                    # Generate data for cone
-                    r = np.linspace(0, sim.c*present_time, 5)
-                    theta = np.linspace(0, 2 * np.pi, 90)
-                    T, R = np.meshgrid(theta, r)
-                    x_range, y_range = R*np.cos(T), R*np.sin(T)
-                    z_cone = -np.sqrt(x_range ** 2 + y_range ** 2) / sim.c
-                    ax.plot_wireframe(x_range+xi, y_range+yi, z_cone+present_time, rstride=10, cstride=10, edgecolor='green')
-
-                    # Plot intersection
-                    ax.scatter(xj[zero_index], yj[zero_index], t_history[zero_index], c='red')
-
-                    if np.abs(s_squared[zero_index]) > (100*sim.base_dt * sim.c)**2 or zero_index == 0:
-                        ax.plot((xi, xj[zero_index]), (yi, yj[zero_index]), (present_time, t_history[zero_index]),
-                                c='red', linestyle='--')
-                    else:
-                        ax.plot((xi, xj[zero_index]), (yi, yj[zero_index]), (present_time, t_history[zero_index]),
-                                c='red')
-
-                    # Configure the plot
-                    ax.set_xlabel('X-Position')
-                    ax.set_ylabel('Y-Position')
-                    ax.set_zlabel('Time')
-                    plt.xlim(-150, 150)
-                    plt.ylim(-150, 150)
-                    plt.title("World-Lines From Simulation")
-
-                    # Show the plot
-                    plt.show()
-
-                # Check whether the interval actually intersects the edge of the light cone
-                if np.abs(s_squared[zero_index]) > (100*sim.base_dt * sim.c)**2:
-                    continue
-                if zero_index == 0:
-                    continue
-
-                # Otherwise, we're good to use the x_j, y_j at the given t
-                delta_x = xj[zero_index] - xi
-                delta_y = yj[zero_index] - yi
-                distance = np.sqrt(delta_x**2 + delta_y**2)
-
-                # Compute the magnitude of the force
-                f = charge[i] * charge[j] / (4*np.pi*epsilon_0*distance**2)
-
-                # Break the force into components and add to net force
-                fx[i] = fx[i] + f * delta_x / distance
-                fy[i] = fy[i] + f * delta_y / distance
-
-        # Return the results
-        return fx, fy
-
-    def forces2(t, x, y, vx, vy, mass, charge):
-        """t, x, y, vx and vy are the entire histories of simulation thus far"""
-        # Declare force arrays
-        fx = np.zeros(x[-1].shape)
-        fy = np.zeros(y[-1].shape)
-
-        # Compute distance between objects as they were
-        x_histories = np.transpose(np.array(x))
-        y_histories = np.transpose(np.array(y))
-        t_history = np.array(t)
-
-        present_time = t[-1]
-
-        for i, (xi, yi) in enumerate(zip(x[-1], y[-1])):
             # Get the histories with the exception of this object's
             other_x_histories = np.delete(x_histories, i, axis=0)
             other_y_histories = np.delete(y_histories, i, axis=0)
@@ -925,7 +832,7 @@ def test6():
         return fx, fy
 
     # Declare simulation
-    sim = Simulation(0.01, 10, forces2, c=10.0)
+    sim = Simulation(0.01, 10, forces, c=10.0)
 
     # Spawn particles
     v_max = sim.c / np.sqrt(2)
@@ -949,11 +856,9 @@ def test6():
 def test7():
     """A moving line of charge with non-instantaneous forces"""
     # Declare function for the forces
-    # TODO: Numpy-ify this force function
     def forces(t, x, y, vx, vy, mass, charge):
         """t, x, y, vx and vy are the entire histories of simulation thus far"""
         # Declare force arrays
-        print(f"{t[-1]} / 10.0")
         fx = np.zeros(x[-1].shape)
         fy = np.zeros(y[-1].shape)
 
@@ -965,39 +870,45 @@ def test7():
         present_time = t[-1]
 
         for i, (xi, yi) in enumerate(zip(x[-1], y[-1])):
-            for j, (xj, yj) in enumerate(zip(x_histories, y_histories)):
-                # xi: Present x-position of object i.
-                # yi: Present y-position of object i.
-                # xj: x-data for the worldline of object j.  Indexed array
-                # yj: y-data for the worldline of object j.  Indexed array
+            # Get the histories with the exception of this object's
+            other_x_histories = np.delete(x_histories, i, axis=0)
+            other_y_histories = np.delete(y_histories, i, axis=0)
+            other_charges = np.delete(charge, i, axis=0)
 
-                # Don't compute force between self and self
-                if i == j:
-                    continue
+            if len(other_x_histories.shape) == 1:
+                other_x_histories = np.reshape(other_x_histories, (other_x_histories.shape[0], 1))
 
-                # Compute space-time interval
-                s_squared = sim.c**2 * (present_time - t_history)**2 - (xi - xj)**2 - (yi - yj)**2
+            if len(other_y_histories.shape) == 1:
+                other_y_histories = np.reshape(other_y_histories, (other_y_histories.shape[0], 1))
 
-                # Find the zero-interval
-                zero_index = np.argmin(np.abs(s_squared))
+            # Compute the space-time interval between this object and all other objects
+            s_squared = sim.c ** 2 * (present_time - t_history) ** 2 - (xi - other_x_histories) ** 2 - (
+                        yi - other_y_histories) ** 2
 
-                # Check whether the interval actually intersects the edge of the light cone
-                if np.abs(s_squared[zero_index]) > (100*sim.base_dt * sim.c)**2:
-                    continue
-                if zero_index == 0:
-                    continue
+            # Find the index of the interval that's zero
+            # s_squared format:
+            # [Object 1: [ Time 1, Time 2,...],
+            #  Object 2: [ Time 1, Time 2,...],
+            #  Object 3: [...],
+            #  ...
+            zero_index = np.argmin(np.abs(s_squared), axis=1)
 
-                # Otherwise, we're good to use the x_j, y_j at the given t
-                delta_x = xj[zero_index] - xi
-                delta_y = yj[zero_index] - yi
-                distance = np.sqrt(delta_x**2 + delta_y**2)
+            # Check for actual intersection
+            check1 = np.abs(s_squared[np.arange(s_squared.shape[0]), zero_index]) > (100 * sim.base_dt * sim.c) ** 2
+            # An index of 0 is probably due to the intersection occurring before the start of the simulation
+            check2 = zero_index == 0
+            valid = np.logical_not(np.logical_or(check1, check2))
 
-                # Compute the magnitude of the force
-                f = charge[i] * charge[j] / (4*np.pi*epsilon_0*distance**2)
+            delta_x = other_x_histories[np.arange(other_x_histories.shape[0]), zero_index] - xi
+            delta_y = other_y_histories[np.arange(other_x_histories.shape[0]), zero_index] - yi
+            distance = np.sqrt(delta_x ** 2 + delta_y ** 2)
 
-                # Break the force into components and add to net force
-                fx[i] = fx[i] + f * delta_x / distance
-                fy[i] = fy[i] + f * delta_y / distance
+            # Compute the magnitude of the force
+            f = charge[i] * other_charges[valid] / (4 * np.pi * epsilon_0 * distance[valid] ** 2)
+
+            # Break the force into components and add to net force
+            fx[i] = np.sum(f * delta_x[valid] / distance[valid])
+            fy[i] = np.sum(f * delta_y[valid] / distance[valid])
 
         # Return the results
         return fx, fy
