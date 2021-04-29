@@ -353,17 +353,9 @@ class Simulation:
         present_time = frame_t_prime
         time_diff = np.abs(t_history_prime - present_time)
         other_present_index = time_diff.argmin(axis=0)
-        #other_present_index = np.unravel_index(other_present_index, time_diff.shape)
 
-        #current_x = x_history_prime[other_present_index]
-        #current_y = y_history_prime[other_present_index]
-
-        # FIXME: Numpy-ify this
-        current_x = np.zeros(other_present_index.shape)
-        current_y = np.zeros(other_present_index.shape)
-        for i, val in enumerate(other_present_index):
-            current_x[i] = x_history_prime[val][i]
-            current_y[i] = y_history_prime[val][i]
+        current_x = x_history_prime[other_present_index, np.arange(x_history_prime.shape[1])]
+        current_y = y_history_prime[other_present_index, np.arange(y_history_prime.shape[1])]
 
         # Return the results
         return current_x, current_y, frame_t_prime
@@ -650,10 +642,10 @@ def main():
     # test3()
 
     # Test 4: Barn and ladder
-    # test4()
+    test4()
 
     # Test 5: Constant force
-    test5()
+    # test5()
 
     # Test 6: Electrostatic force
     # test6()
