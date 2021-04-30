@@ -93,7 +93,7 @@ class Simulation:
         self.Fx = np.zeros(object_count)
         self.Fy = np.zeros(object_count)
 
-    def add_point(self, x, y, vx, vy, mass, charge):
+    def add_point(self, x: float, y: float, vx: float, vy: float, mass: float, charge: float):
         """Adds a point-mass to the system"""
         self.x = np.append(self.x, x)
         self.y = np.append(self.y, y)
@@ -102,7 +102,7 @@ class Simulation:
         self.mass = np.append(self.mass, mass)
         self.charge = np.append(self.charge, charge)
 
-    def add_polygon(self, x_array, y_array, x0, y0, vx, vy, mass_array=None, charge_array=None):
+    def add_polygon(self, x_array: list, y_array: list, x0: float, y0: float, vx: float, vy: float, mass_array: list=None, charge_array: list=None):
         """Adds a polygon to the system.  x_array and y_array denote the positions of the points in the polygon's own
         frame.  The polygon is then transformed to the origin's reference frame and placed relative to (x0, y0)"""
         # Get the number of new points being added
@@ -261,87 +261,79 @@ class Simulation:
         self.vx_history.append(self.vx)
         self.vy_history.append(self.vy)
 
-    def lorentz_boost(self, time_index, x, y, vx, vy):
+    def lorentz_boost(self, time_index: int, x, y, vx, vy):
         """Calculated the Lorentz boosted position of all objects"""
-        # Obtain the velocity relative to the origin
+        # Obtain the velocity and space-time position relative to the origin
         if self.reference_index == -1:
             # Currently in the origin's frame
-            vel = np.array([0.0, 0.0])
+            # vel = np.array([0.0, 0.0])
+            ref_vel_x_history = np.zeros(len(self.vx_history))
+            ref_vel_y_history = np.zeros(len(self.vy_history))
             frame_x, frame_y, frame_t = 0.0, 0.0, self.time[time_index]
-            n = np.array([0.0, 0.0])
-            gamma = 1.0
         else:
             # Currently in some other frame
-            vel = np.array([vx[self.reference_index], vy[self.reference_index]])
-
-            # Get position of other frame according to origin
+            # vel = np.array([vx[self.reference_index], vy[self.reference_index]])
+            ref_vel_x_history = np.array(self.vx_history)[:, self.reference_index]
+            ref_vel_y_history = np.array(self.vy_history)[:, self.reference_index]
             frame_x, frame_y, frame_t = x[self.reference_index], y[self.reference_index], self.time[time_index]
 
-            # Compute the lorentz factor of the frame
-            gamma = 1 / np.sqrt(1 - np.linalg.norm(vel)**2 / self.c**2)
+        # Compute the lorentz factor of the frame
+        gamma_history = 1 / np.sqrt(1 - (ref_vel_x_history ** 2 + ref_vel_y_history ** 2) / self.c ** 2)
+        # current_gamma = 1 / np.sqrt(1 - np.linalg.norm(vel)**2 / self.c**2)
 
-            # Compute the unit velocity vector (relative to the origin), removing any NaNs that might appear
-            n = vel / np.linalg.norm(vel)
-            n = np.nan_to_num(n, nan=0.0)
-
-        # Obtain unit vector in the direction of the velocity
-        #n_x_history = vel_x_history / np.sqrt(vel_x_history**2 + vel_y_history**2)
-        #n_y_history = vel_y_history / np.sqrt(vel_y_history**2 + vel_y_history**2)
-        #n_x_history = np.nan_to_num(n_x_history, nan=0.0)
-        #n_y_history = np.nan_to_num(n_y_history, nan=0.0)
+        # Compute the unit velocity vector (relative to the origin), removing any NaNs that might appear
+        n_x_history = ref_vel_x_history / np.sqrt(ref_vel_x_history**2 + ref_vel_y_history**2)
+        n_y_history = ref_vel_y_history / np.sqrt(ref_vel_x_history**2 + ref_vel_y_history**2)
+        n_x_history = np.nan_to_num(n_x_history, nan=0.0)
+        n_y_history = np.nan_to_num(n_y_history, nan=0.0)
 
         # Convert history to numpy arrays
-        # Format [time 1: [object1:[property], object2,...], time 2:..., time 3:...]
+        # Format:
         # [Time 1: [object 1, object 2, object 3... ]
         #  Time 2: [object 1, object 2,...]
         #  Time 3: [...]...]
         x_history = np.array(self.x_history)
         y_history = np.array(self.y_history)
-        vx_history = np.array(self.vx_history)
-        vy_history = np.array(self.vy_history)
 
         # Generate t-history using the origin's definition of simultaneity
         t_history = np.tile(np.array(self.time), (self.object_count, 1)).transpose()
 
-        # TODO: Implement generalized reference frame shift
-        # Compute gamma history
-        #gamma_history = 1/np.sqrt((vel_x_history**2 + vel_y_history**2)/self.c)
+        # FIXME: Accelerating objects are travelling backwards in time?
+        # Time coordinate transform:
+        # Use the trapezoidal method to compute the time integral of the Lorentz factor of the current frame's history
+        delta_t = t_history[1:] - t_history[:-1]
+        gamma_integral = np.cumsum(((gamma_history[1:] + gamma_history[:-1])/2)[:, None] * delta_t, axis=0)
+        # Add a row of zeros for t=0
+        gamma_integral = np.insert(gamma_integral, 0, np.zeros(gamma_integral.shape[1])).reshape(t_history.shape)
 
-        # Apply the Lorentz-boost to convert to a frame moving at the same velocity as the reference index's
-        # TIME COORDINATE TRANSFORM:
-        # Compute the integral of the Lorentz factor from t=0 to t=now using the trapezoidal method
-        #delta_t = t_history[1:] - t_history[:-1]
-        #gamma_integral = np.cumsum((gamma_history[1:] + gamma_history[:-1])/2 * delta_t, axis=0)
+        # Compute the time-shift due to velocity and position
+        time_shift = gamma_history[:, None] * (ref_vel_x_history[:, None] * x_history + ref_vel_y_history[:, None] * y_history) / self.c**2
 
-
-        #gamma_integral = np.insert(gamma_integral, 0, np.zeros(gamma_integral.shape[1]), axis=0)
+        # Compute t-prime
+        t_history_prime = gamma_integral - time_shift
 
         # SPATIAL COORDINATE TRANSFORM:
-        t_history_prime = gamma * (t_history - (vel[0] * x_history + vel[1] * y_history) / self.c**2)
-        #t_history_prime = gamma_integral - gamma_history*(vel_x_history*x_history + vel_y_history) / self.c**2
-
         # Compute the integral of the Lorentz factor times the velocity from t=0 to t=now
-        #vel_x_gamma_integral = np.cumsum((vel_x_history[1:] * gamma_history[1:] + vel_x_history[:-1] * gamma_history[:-1])/2 * delta_t, axis=0)
-        #vel_y_gamma_integral = np.cumsum((vel_y_history[1:] * gamma_history[1:] + vel_y_history[:-1] * gamma_history[:-1])/2 * delta_t, axis=0)
+        vel_x_gamma_integral = np.cumsum(((ref_vel_x_history[1:] * gamma_history[1:] + ref_vel_x_history[:-1] * gamma_history[:-1])/2)[:, None] * delta_t[:], axis=0)
+        vel_y_gamma_integral = np.cumsum(((ref_vel_y_history[1:] * gamma_history[1:] + ref_vel_y_history[:-1] * gamma_history[:-1])/2)[:, None] * delta_t[:], axis=0)
+        # Add a row of zeros for t=0
+        vel_x_gamma_integral = np.insert(vel_x_gamma_integral, 0, np.zeros(vel_x_gamma_integral.shape[1])).reshape(t_history.shape)
+        vel_y_gamma_integral = np.insert(vel_y_gamma_integral, 0, np.zeros(vel_y_gamma_integral.shape[1])).reshape(t_history.shape)
 
-        #x_history_prime = x_history + (gamma_history - 1) * (x_history * n_x_history + y_history * n_y_history) * n_x_history - vel_x_gamma_integral
-        #y_history_prime = y_history + (gamma_history - 1) * (x_history * n_x_history + y_history * n_y_history) * n_y_history - vel_x_gamma_integral
+        x_pos_shift = (gamma_history - 1)[:, None] * (x_history*n_x_history[:, None] + y_history*n_y_history[:, None]) * n_x_history[:, None]
+        y_pos_shift = (gamma_history - 1)[:, None] * (x_history*n_x_history[:, None] + y_history*n_y_history[:, None]) * n_y_history[:, None]
 
-        x_history_prime = x_history + (gamma-1)*(x_history*n[0] + y_history*n[1]) * n[0] - gamma*t_history*vel[0]
-        y_history_prime = y_history + (gamma-1)*(x_history*n[0] + y_history*n[1]) * n[1] - gamma*t_history*vel[1]
+        x_history_prime = x_history + x_pos_shift - vel_x_gamma_integral
+        y_history_prime = y_history + y_pos_shift - vel_y_gamma_integral
 
-        frame_t_prime = gamma * (frame_t - (vel[0] * frame_x + vel[1] * frame_y) / self.c**2)
-        frame_x_prime = frame_x + (gamma-1)*(frame_x*n[0] + frame_y*n[1]) * n[0] - gamma*frame_t*vel[0]
-        frame_y_prime = frame_y + (gamma-1)*(frame_x*n[0] + frame_y*n[1]) * n[1] - gamma*frame_t*vel[1]
-
-        #if self.reference_index == -1:
-        #    frame_x_prime = 0.0
-        #    frame_y_prime = 0.0
-        #    frame_t_prime = frame_t
-        #else:
-        #    frame_x_prime = x_history_prime[-1][self.reference_index]
-        #    frame_y_prime = y_history_prime[-1][self.reference_index]
-        #    frame_t_prime = t_history_prime[-1][self.reference_index]
+        if self.reference_index == -1:
+            frame_x_prime = 0.0
+            frame_y_prime = 0.0
+            frame_t_prime = frame_t
+        else:
+            frame_x_prime = x_history_prime[time_index][self.reference_index]
+            frame_y_prime = y_history_prime[time_index][self.reference_index]
+            frame_t_prime = t_history_prime[time_index][self.reference_index]
 
         # Shift the primed frame to place the target object at the center
         x_offset = frame_x_prime
@@ -424,7 +416,7 @@ class Simulation:
             for i, j in points:
                 pygame.draw.circle(self.window, (255, 0, 0), win_center+(int(i), int(j)), 5)
 
-    def draw_info(self, paused, present_time, proper_time, mouse_pos, ruler_start):
+    def draw_info(self, paused, present_time, primed_time, mouse_pos, ruler_start):
         """Adds informational items/text"""
         # Obtain the center of the window
         win_center = (self.win_size / 2).astype(int)
@@ -437,7 +429,7 @@ class Simulation:
         pygame.draw.line(self.window, (0, 128, 128), win_center - (0, 10), win_center + (0, 10), 2)
 
         # Draw info
-        proper_time_text = self.font.render(f"Proper Time: {proper_time:.2f}", 12, (255, 255, 255))
+        proper_time_text = self.font.render(f"Primed Time: {primed_time:.2f}", 12, (255, 255, 255))
         origin_time_text = self.font.render(f"Origin Time:  {present_time:.2f}", 12, (255, 255, 255))
         position_text = self.font.render(f"Mouse Pos: {shifted_mouse_pos[0]}, {shifted_mouse_pos[1]}", 12, (255, 255, 255))
         self.window.blit(proper_time_text, (45, 0))
@@ -516,7 +508,7 @@ class Simulation:
             mouse_pos = np.array(pygame.mouse.get_pos())
 
             # Compute effect of Lorentz boost
-            x_prime, y_prime, proper_time = self.lorentz_boost(int(indexed_time),
+            x_prime, y_prime, primed_time = self.lorentz_boost(int(indexed_time),
                                                                self.x_history[int(indexed_time)],
                                                                self.y_history[int(indexed_time)],
                                                                self.vx_history[int(indexed_time)],
@@ -580,7 +572,7 @@ class Simulation:
                     pass
 
             # Draw info
-            self.draw_info(paused, self.time[int(indexed_time)], proper_time, mouse_pos, ruler_start)
+            self.draw_info(paused, self.time[int(indexed_time)], primed_time, mouse_pos, ruler_start)
 
             # Flip the display buffer with the window
             pygame.display.flip()
@@ -602,11 +594,9 @@ class Simulation:
         ax = fig.add_subplot(projection='3d')
 
         # Plot the world lines
-        # Reshape the x-history and y-history such that the first index denotes a worldline
+        # Reshape the x-history and y-history such that the first index denotes an object's worldline
         x_positions = np.transpose(np.array(self.x_history))
         y_positions = np.transpose(np.array(self.y_history))
-
-        # TODO: Make it so polygons are rendered as polygons rather than ordinary points
 
         for worldline_x, worldline_y in zip(x_positions, y_positions):
             ax.plot(worldline_x, worldline_y, self.time)
@@ -642,16 +632,19 @@ def main():
     # test3()
 
     # Test 4: Barn and ladder
-    test4()
+    # test4()
 
     # Test 5: Constant force
     # test5()
+
+    # Test 5.1: Gradually decreasing force
+    # test5_1()
 
     # Test 6: Electrostatic force
     # test6()
 
     # Test 7: Moving line of charge
-    # test7()
+    test7()
 
 
 def test1():
@@ -775,6 +768,46 @@ def test5():
 
     # Show the results
     sim.show()
+
+    # Show a plot of the results
+    sim.plot()
+
+
+def test5_1():
+    """Acceleration of a particle due to a decreasing force to the right"""
+    # Build function for forces
+    def forces(t, x, y, vx, vy, mass, charge):
+        # Declare force array
+        force_x = np.zeros(x[-1].shape)
+        force_y = np.zeros(y[-1].shape)
+
+        # Apply a constant force to the third particle
+        force_x[2] = 1.0 * np.exp(-t[-1] / 10)
+
+        # Return the results
+        return force_x, force_y
+
+    # Declare simulation
+    sim = Simulation(0.01, 75, forces)
+
+    # Add observer
+    sim.add_point(0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+
+    # Add photon
+    sim.add_point(0.0, 10.0, sim.c, 0.0, 0.0, 0.0)
+
+    # Add accelerating particle
+    sim.add_point(0.0, -10.0, 0.0, 0.0, 1.0, 0.0)
+
+    # Add a particle with a constant, sub-light velocity
+    sim.add_point(0.0, -20.0, sim.c / 2, 0.0, 1.0, 0.0)
+    sim.add_point(0.0, -30.0, sim.c / 4, 0.0, 1.0, 0.0)
+
+    # Run the simulation
+    sim.run(method='rk4', print_progress=True)
+
+    # Show the results
+    sim.show(max_fps=-1)
 
     # Show a plot of the results
     sim.plot()
