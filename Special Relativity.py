@@ -1,6 +1,7 @@
 import pygame
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 #from scipy.constants import epsilon_0
 epsilon_0 = 1.0e-6
 
@@ -562,15 +563,6 @@ class Simulation:
             # Draw the screen
             self.draw_screen(x_prime, y_prime)
 
-            # Draw the light cones of the initial positions
-            for i, j in zip(self.x_history[0], self.y_history[0]):
-                break
-                try:
-                    pygame.draw.circle(self.window, (0, 0, 255), (self.win_size/2 + (i, j)).astype(int),
-                                       int(self.time[int(indexed_time)] * self.c), 2)
-                except ValueError:
-                    pass
-
             # Draw info
             self.draw_info(paused, self.time[int(indexed_time)], primed_time, mouse_pos, ruler_start)
 
@@ -619,11 +611,45 @@ class Simulation:
         # Show the plot
         plt.show()
 
+    def save(self, file_name):
+        """Saves simulation results to a .csv file"""
+        # Put the data into a pandas data-frame
+        # Convert histories into a 1D array for the purposes of saving
+        array_length = len(self.time) * self.object_count
+        x_history = np.array(self.x_history).reshape(array_length)
+        y_history = np.array(self.y_history).reshape(array_length)
+        vx_history = np.array(self.vx_history).reshape(array_length)
+        vy_history = np.array(self.vy_history).reshape(array_length)
+
+        data = pd.DataFrame(data=[x_history, y_history, vx_history, vy_history, np.array(self.time), self.mass,
+                                  self.charge, np.array([self.c, len(self.time), self.object_count])],
+                            index=["X-History", "Y-History", "VX-History", "VY-History", "Time", "Mass", "Charge",
+                                   "Parameters"])
+
+        # Save to file
+        data.to_csv(file_name)
+
+    def load(self, file_name):
+        """Loads simulation data from a .csv file"""
+        # Load data-frame from file
+        data = pd.read_csv(file_name, index_col=0)
+
+        time_length, object_count = int(data.loc["Parameters"][1]), int(data.loc["Parameters"][2])
+
+        # Load data from data-frame into simulation data
+        self.x_history = list(data.loc["X-History"].to_numpy().reshape(time_length, object_count))
+        self.y_history = list(data.loc["Y-History"].to_numpy().reshape(time_length, object_count))
+        self.vx_history = list(data.loc["VX-History"].to_numpy().reshape(time_length, object_count))
+        self.vy_history = list(data.loc["VY-History"].to_numpy().reshape(time_length, object_count))
+        self.time = list(data.loc["Time"].to_numpy()[:time_length])
+        self.mass = data.loc["Mass"].to_numpy()[:object_count]
+        self.charge = data.loc["Charge"].to_numpy()[:object_count]
+        self.c = data.loc["Parameters"][0]
 
 # Main program
 def main():
     # Test 1: Random particles
-    # test1()
+    test1()
 
     # Test 2: Polygon
     # test2()
@@ -644,7 +670,7 @@ def main():
     # test6()
 
     # Test 7: Moving line of charge
-    test7()
+    # test7()
 
 
 def test1():
