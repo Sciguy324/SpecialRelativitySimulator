@@ -498,7 +498,7 @@ class Simulation:
 
         # Open the window
         pygame.display.init()
-        self.window = pygame.display.set_mode(self.win_size)
+        self.window = pygame.display.set_mode(self.win_size, flags=pygame.RESIZABLE)
         pygame.display.set_caption("Special Relativity Simulation")
 
         # Perform initial calculation of the primed world-lines
@@ -522,7 +522,12 @@ class Simulation:
                 if event.type == pygame.QUIT:
                     done = True
 
-                # User pressed a key
+                # User resized the window
+                if event.type == pygame.VIDEORESIZE:
+                    self.win_size = np.array(event.size)
+                    self.window = pygame.display.set_mode(self.win_size, flags=pygame.RESIZABLE)
+
+                    # User pressed a key
                 if event.type == pygame.KEYDOWN:
                     # ESC: Return to origin frame
                     if event.key == pygame.K_ESCAPE:
