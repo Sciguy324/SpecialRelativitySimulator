@@ -2,6 +2,7 @@ import pygame
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from typing import Callable, Tuple
 #from scipy.constants import epsilon_0
 epsilon_0 = 1.0e-6
 
@@ -13,7 +14,7 @@ pygame.init()
 class Simulation:
     """Class for running simulations in special relativity"""
 
-    def __init__(self, base_dt, t_max, forces_func=None, c=10.0):
+    def __init__(self, base_dt: float, t_max: float, forces_func: Callable[..., Tuple[np.ndarray, np.ndarray]] = None, c: float = 10.0):
         """physics_func: additional function to apply forces
         base_dt: time-step relative to the user
         t_max: final time, in the origin's frame, to simulate to"""
@@ -76,7 +77,7 @@ class Simulation:
         return np.zeros(self.object_count), np.zeros(self.object_count)
 
     def basic_random_start(self, x_range: tuple, y_range: tuple, vx_range: tuple, vy_range: tuple, q_range: tuple, max_m: float, object_count: int):
-        """Randomly generates starting conditions.  Particles are uncharged
+        """Randomly populates the simulation with a collection of points.
         Note: this will erase any currently stored points"""
         # Randomly generate positions
         self.x = (x_range[1]-x_range[0]) * np.random.rand(object_count) + x_range[0]
@@ -103,7 +104,7 @@ class Simulation:
         self.mass = np.append(self.mass, mass)
         self.charge = np.append(self.charge, charge)
 
-    def add_polygon(self, x_array: list, y_array: list, x0: float, y0: float, vx: float, vy: float, mass_array: list=None, charge_array: list=None):
+    def add_polygon(self, x_array: list, y_array: list, x0: float, y0: float, vx: float, vy: float, mass_array: list = None, charge_array: list = None):
         """Adds a polygon to the system.  x_array and y_array denote the positions of the points in the polygon's own
         frame.  The polygon is then transformed to the origin's reference frame and placed relative to (x0, y0)"""
         # Get the number of new points being added
@@ -148,7 +149,7 @@ class Simulation:
         else:
             self.charge = np.append(self.charge, charge_array)
 
-    def force_to_acceleration(self, vx, vy, mass, fx, fy):
+    def force_to_acceleration(self, vx: np.ndarray, vy: np.ndarray, mass: np.ndarray, fx: np.ndarray, fy: np.ndarray) -> (np.ndarray, np.ndarray):
         """Computes relativistic acceleration on all points given the forces acting on all points"""
         # Compute relativistic acceleration
         velocity_squared = vx ** 2 + vy ** 2
@@ -262,7 +263,7 @@ class Simulation:
         self.vx_history.append(self.vx)
         self.vy_history.append(self.vy)
 
-    def lorentz_boost(self):
+    def lorentz_boost(self) -> (np.ndarray, np.ndarray, np.ndarray):
         """Calculated the Lorentz boosted position of all objects"""
         # Obtain the velocity and space-time position relative to the origin
         if self.reference_index == -1:
@@ -325,7 +326,7 @@ class Simulation:
         # Return the results
         return t_history_prime, x_history_prime, y_history_prime
 
-    def obtain_present(self, time_index: int, t_history_prime, x_history_prime, y_history_prime):
+    def obtain_present(self, time_index: int, t_history_prime: np.ndarray, x_history_prime: np.ndarray, y_history_prime: np.ndarray):
         """Obtain the present view of the reference object at the given time_index"""
         # Obtain the current (t, x, y) position of the selected reference frame relative to the origin's frame
         if self.reference_index == -1:
@@ -354,7 +355,7 @@ class Simulation:
         # Return the results
         return current_x, current_y, frame_t_prime
 
-    def draw_screen(self, x, y):
+    def draw_screen(self, x: np.ndarray, y: np.ndarray):
         """Draws all objects on the screen"""
         # Get the center of the window—the reference frame should be drawn at the center.
         # Coordinates must be integers to appease pygame
@@ -418,7 +419,7 @@ class Simulation:
             for i, j in points:
                 pygame.draw.circle(self.window, (255, 0, 0), win_center+(int(i), int(j)), 5)
 
-    def draw_info(self, paused, present_time, primed_time, mouse_pos, ruler_start):
+    def draw_info(self, paused: bool, present_time: float, primed_time: float, mouse_pos: np.ndarray, ruler_start: np.ndarray):
         """Adds informational items/text"""
         # Obtain the center of the window
         win_center = (self.win_size / 2).astype(int)
@@ -458,7 +459,7 @@ class Simulation:
             ruler_text = self.font.render(f"Ruler: -", 12, (255, 255, 255))
         self.window.blit(ruler_text, (10, 90))
 
-    def run(self, method='rk4', print_progress=False):
+    def run(self, method: str = 'rk4', print_progress: bool = False):
         """Runs the simulation"""
         # Record initial positions to history
         self.x_history.append(self.x)
@@ -485,7 +486,7 @@ class Simulation:
                 if not len(self.time) % 10:
                     print(f"Time: {self.time[-1]} / {self.t_max}")
 
-    def show(self, t_start=0.0, t_stop=None, max_fps=90):
+    def show(self, t_start: float = 0.0, t_stop: float = None, max_fps: int = 90):
         """Shows an interactive window of the simulation's results"""
         # If user entered a start time, find the nearest time-index to start at
         indexed_time = float(np.abs(np.array(self.time) - t_start).argmin())
@@ -593,19 +594,24 @@ class Simulation:
         # Close the display module
         pygame.display.quit()
 
-    def plot(self):
+    def plot(self, reference_frame: int = -1, x_lim: tuple = None, y_lim: tuple = None, t_lim: tuple = None):
         """Plot the world-lines from the simulation"""
         # Set up the plot
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
 
+        # Switch to the provided reference frame, if applicable
+        self.reference_index = reference_frame
+        t_history, x_history, y_history = self.lorentz_boost()
+
         # Plot the world lines
         # Reshape the x-history and y-history such that the first index denotes an object's worldline
-        x_positions = np.transpose(np.array(self.x_history))
-        y_positions = np.transpose(np.array(self.y_history))
+        x_positions = np.transpose(np.array(x_history))
+        y_positions = np.transpose(np.array(y_history))
+        t_positions = np.transpose(np.array(t_history))
 
-        for worldline_x, worldline_y in zip(x_positions, y_positions):
-            ax.plot(worldline_x, worldline_y, self.time)
+        for worldline_x, worldline_y, worldline_t in zip(x_positions, y_positions, t_positions):
+            ax.plot(worldline_x, worldline_y, worldline_t)
 
         # Mark the origin
         ax.scatter((0.0,), (0.0,), color="red")
@@ -621,11 +627,14 @@ class Simulation:
         ax.set_ylabel('Y-Position')
         ax.set_zlabel('Time')
         plt.title("World-Lines From Simulation")
+        ax.set_xlim(x_lim)
+        ax.set_ylim(y_lim)
+        ax.set_zlim(t_lim)
 
         # Show the plot
         plt.show()
 
-    def save(self, file_name):
+    def save(self, file_name: str):
         """Saves simulation results to a .csv file"""
         # Put the data into a pandas data-frame
         # Convert histories into a 1D array for the purposes of saving
@@ -644,7 +653,7 @@ class Simulation:
         # Save to file
         data.to_csv(file_name)
 
-    def load(self, file_name):
+    def load(self, file_name: str):
         """Loads simulation data from a .csv file"""
         # Load data-frame from file
         data = pd.read_csv(file_name, index_col=0)
@@ -922,7 +931,6 @@ def test6():
     sim = Simulation(0.01, 10, forces, c=10.0)
 
     # Spawn particles
-    v_max = sim.c / np.sqrt(2)
     spread = 50
     sim.basic_random_start((-spread, spread), (-spread, spread),
                            (-0.0, 0.0), (-0.0, 0.0),
@@ -948,10 +956,11 @@ def test6_1():
     sim = Simulation(1.0, 1.0)
 
     # Load simulation data from a file
-    sim.load("Electrostatic Simulation.csv")
+    sim.load("Electrostatic Simulation 2.csv")
 
     # Show the simulation
-    sim.show()
+    #sim.show()
+    sim.plot(5, x_lim=(-100, 100), y_lim=(-100, 100), t_lim=(-10, 10))
 
 
 def test7():
