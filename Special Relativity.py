@@ -69,7 +69,7 @@ class Simulation:
 
     @property
     def object_count(self):
-        return self.x.shape[0]
+        return self.x_history[0].shape[0]
 
     def _default_force_func(self, *args):
         """Calculates the forces acting on particles in the absence of forces.  The default behavior."""
@@ -509,6 +509,7 @@ class Simulation:
             mouse_pos = np.array(pygame.mouse.get_pos())
 
             # Compute effect of Lorentz boost
+            # TODO: Make it so the Lorentz boosts only need to be called once upon switching frames
             x_prime, y_prime, primed_time = self.lorentz_boost(int(indexed_time),
                                                                self.x_history[int(indexed_time)],
                                                                self.y_history[int(indexed_time)],
@@ -621,6 +622,7 @@ class Simulation:
         vx_history = np.array(self.vx_history).reshape(array_length)
         vy_history = np.array(self.vy_history).reshape(array_length)
 
+        # Load all data into a data-frame
         data = pd.DataFrame(data=[x_history, y_history, vx_history, vy_history, np.array(self.time), self.mass,
                                   self.charge, np.array([self.c, len(self.time), self.object_count])],
                             index=["X-History", "Y-History", "VX-History", "VY-History", "Time", "Mass", "Charge",
@@ -634,6 +636,7 @@ class Simulation:
         # Load data-frame from file
         data = pd.read_csv(file_name, index_col=0)
 
+        # Obtain size to reshape to history arrays to
         time_length, object_count = int(data.loc["Parameters"][1]), int(data.loc["Parameters"][2])
 
         # Load data from data-frame into simulation data
@@ -646,10 +649,11 @@ class Simulation:
         self.charge = data.loc["Charge"].to_numpy()[:object_count]
         self.c = data.loc["Parameters"][0]
 
+
 # Main program
 def main():
     # Test 1: Random particles
-    test1()
+    # test1()
 
     # Test 2: Polygon
     # test2()
@@ -668,6 +672,9 @@ def main():
 
     # Test 6: Electrostatic force
     # test6()
+
+    # Test 6.1: Electrostatic force loaded from a file
+    test6_1()
 
     # Test 7: Moving line of charge
     # test7()
@@ -899,7 +906,7 @@ def test6():
         return fx, fy
 
     # Declare simulation
-    sim = Simulation(0.01, 20, forces, c=10.0)
+    sim = Simulation(0.01, 10, forces, c=10.0)
 
     # Spawn particles
     v_max = sim.c / np.sqrt(2)
@@ -911,12 +918,27 @@ def test6():
                            10)
 
     # Run simulation
-    sim.run(method='rk4')
+    sim.run(method='rk4', print_progress=True)
 
     # Show the results
     sim.show()
 
     sim.plot()
+
+    # Save the results to a file
+    sim.save("Electrostatic Simulation 2.csv")
+
+
+def test6_1():
+    """Full, non-instantaneous electrostatic forces"""
+    # Declare the simulation
+    sim = Simulation(1.0, 1.0)
+
+    # Load simulation data from a file
+    sim.load("Electrostatic Simulation.csv")
+
+    # Show the simulation
+    sim.show()
 
 
 def test7():
