@@ -262,29 +262,24 @@ class Simulation:
         self.vx_history.append(self.vx)
         self.vy_history.append(self.vy)
 
-    def lorentz_boost(self, time_index: int, x, y, vx, vy):
+    def lorentz_boost(self):
         """Calculated the Lorentz boosted position of all objects"""
         # Obtain the velocity and space-time position relative to the origin
         if self.reference_index == -1:
             # Currently in the origin's frame
-            # vel = np.array([0.0, 0.0])
-            ref_vel_x_history = np.zeros(len(self.vx_history))
-            ref_vel_y_history = np.zeros(len(self.vy_history))
-            frame_x, frame_y, frame_t = 0.0, 0.0, self.time[time_index]
+            ref_vx_history = np.zeros(len(self.vx_history))
+            ref_vy_history = np.zeros(len(self.vy_history))
         else:
             # Currently in some other frame
-            # vel = np.array([vx[self.reference_index], vy[self.reference_index]])
-            ref_vel_x_history = np.array(self.vx_history)[:, self.reference_index]
-            ref_vel_y_history = np.array(self.vy_history)[:, self.reference_index]
-            frame_x, frame_y, frame_t = x[self.reference_index], y[self.reference_index], self.time[time_index]
+            ref_vx_history = np.array(self.vx_history)[:, self.reference_index]
+            ref_vy_history = np.array(self.vy_history)[:, self.reference_index]
 
         # Compute the lorentz factor of the frame
-        gamma_history = 1 / np.sqrt(1 - (ref_vel_x_history ** 2 + ref_vel_y_history ** 2) / self.c ** 2)
-        # current_gamma = 1 / np.sqrt(1 - np.linalg.norm(vel)**2 / self.c**2)
+        gamma_history = 1 / np.sqrt(1 - (ref_vx_history ** 2 + ref_vy_history ** 2) / self.c ** 2)
 
         # Compute the unit velocity vector (relative to the origin), removing any NaNs that might appear
-        n_x_history = ref_vel_x_history / np.sqrt(ref_vel_x_history**2 + ref_vel_y_history**2)
-        n_y_history = ref_vel_y_history / np.sqrt(ref_vel_x_history**2 + ref_vel_y_history**2)
+        n_x_history = ref_vx_history / np.sqrt(ref_vx_history**2 + ref_vy_history**2)
+        n_y_history = ref_vy_history / np.sqrt(ref_vx_history**2 + ref_vy_history**2)
         n_x_history = np.nan_to_num(n_x_history, nan=0.0)
         n_y_history = np.nan_to_num(n_y_history, nan=0.0)
 
@@ -308,29 +303,35 @@ class Simulation:
         gamma_integral = np.insert(gamma_integral, 0, np.zeros(gamma_integral.shape[1])).reshape(t_history.shape)
 
         # Compute the time-shift due to velocity and position
-        time_shift = gamma_history[:, None] * (ref_vel_x_history[:, None] * x_history + ref_vel_y_history[:, None] * y_history) / self.c**2
+        time_shift = gamma_history[:, None] * (ref_vx_history[:, None] * x_history + ref_vy_history[:, None] * y_history) / self.c**2
 
         # Compute t-prime
         t_history_prime = gamma_integral - time_shift
 
         # SPATIAL COORDINATE TRANSFORM:
         # Compute the integral of the Lorentz factor times the velocity from t=0 to t=now
-        vel_x_gamma_integral = np.cumsum(((ref_vel_x_history[1:] * gamma_history[1:] + ref_vel_x_history[:-1] * gamma_history[:-1])/2)[:, None] * delta_t[:], axis=0)
-        vel_y_gamma_integral = np.cumsum(((ref_vel_y_history[1:] * gamma_history[1:] + ref_vel_y_history[:-1] * gamma_history[:-1])/2)[:, None] * delta_t[:], axis=0)
+        vx_gamma_integral = np.cumsum(((ref_vx_history[1:] * gamma_history[1:] + ref_vx_history[:-1] * gamma_history[:-1])/2)[:, None] * delta_t[:], axis=0)
+        vy_gamma_integral = np.cumsum(((ref_vy_history[1:] * gamma_history[1:] + ref_vy_history[:-1] * gamma_history[:-1])/2)[:, None] * delta_t[:], axis=0)
         # Add a row of zeros for t=0
-        vel_x_gamma_integral = np.insert(vel_x_gamma_integral, 0, np.zeros(vel_x_gamma_integral.shape[1])).reshape(t_history.shape)
-        vel_y_gamma_integral = np.insert(vel_y_gamma_integral, 0, np.zeros(vel_y_gamma_integral.shape[1])).reshape(t_history.shape)
+        vx_gamma_integral = np.insert(vx_gamma_integral, 0, np.zeros(vx_gamma_integral.shape[1])).reshape(t_history.shape)
+        vy_gamma_integral = np.insert(vy_gamma_integral, 0, np.zeros(vy_gamma_integral.shape[1])).reshape(t_history.shape)
 
         x_pos_shift = (gamma_history - 1)[:, None] * (x_history*n_x_history[:, None] + y_history*n_y_history[:, None]) * n_x_history[:, None]
         y_pos_shift = (gamma_history - 1)[:, None] * (x_history*n_x_history[:, None] + y_history*n_y_history[:, None]) * n_y_history[:, None]
 
-        x_history_prime = x_history + x_pos_shift - vel_x_gamma_integral
-        y_history_prime = y_history + y_pos_shift - vel_y_gamma_integral
+        x_history_prime = x_history + x_pos_shift - vx_gamma_integral
+        y_history_prime = y_history + y_pos_shift - vy_gamma_integral
 
+        # Return the results
+        return t_history_prime, x_history_prime, y_history_prime
+
+    def obtain_present(self, time_index: int, t_history_prime, x_history_prime, y_history_prime):
+        """Obtain the present view of the reference object at the given time_index"""
+        # Obtain the current (t, x, y) position of the selected reference frame relative to the origin's frame
         if self.reference_index == -1:
             frame_x_prime = 0.0
             frame_y_prime = 0.0
-            frame_t_prime = frame_t
+            frame_t_prime = self.time[time_index]
         else:
             frame_x_prime = x_history_prime[time_index][self.reference_index]
             frame_y_prime = y_history_prime[time_index][self.reference_index]
@@ -500,6 +501,9 @@ class Simulation:
         self.window = pygame.display.set_mode(self.win_size)
         pygame.display.set_caption("Special Relativity Simulation")
 
+        # Perform initial calculation of the primed world-lines
+        t_history_prime, x_history_prime, y_history_prime = self.lorentz_boost()
+
         # Main display loop
         done = False
         paused = False
@@ -508,13 +512,9 @@ class Simulation:
             # Obtain mouse position relative to the center
             mouse_pos = np.array(pygame.mouse.get_pos())
 
-            # Compute effect of Lorentz boost
-            # TODO: Make it so the Lorentz boosts only need to be called once upon switching frames
-            x_prime, y_prime, primed_time = self.lorentz_boost(int(indexed_time),
-                                                               self.x_history[int(indexed_time)],
-                                                               self.y_history[int(indexed_time)],
-                                                               self.vx_history[int(indexed_time)],
-                                                               self.vy_history[int(indexed_time)])
+            # Obtain the present positions of everything
+            x_prime, y_prime, primed_time = self.obtain_present(int(indexed_time),
+                                                                t_history_prime, x_history_prime, y_history_prime)
 
             # Handle pygame events
             for event in pygame.event.get():
@@ -527,6 +527,9 @@ class Simulation:
                     # ESC: Return to origin frame
                     if event.key == pygame.K_ESCAPE:
                         self.reference_index = -1
+
+                        # Recalculate Lorentz-boosted world-lines
+                        t_history_prime, x_history_prime, y_history_prime = self.lorentz_boost()
 
                     # Space: Pause
                     if event.key == pygame.K_SPACE:
@@ -554,7 +557,12 @@ class Simulation:
                                 print("Target object is superluminal!?")
                                 nearest_index = -1
 
+                            # Confirm the new reference index
                             self.reference_index = nearest_index
+
+                            # Recalculate the primed world-lines.  This only needs to be run once upon changing frames
+                            # since it calculates across the entire history of the world-lines.
+                            t_history_prime, x_history_prime, y_history_prime = self.lorentz_boost()
 
                     # Right mouse button: start ruler
                     if event.button == pygame.BUTTON_RIGHT:
