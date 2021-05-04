@@ -226,9 +226,6 @@ class Simulation:
                                   self.x_history + [self.x + k2_x/2], self.y_history + [self.y + k2_y/2],
                                   self.vx_history + [self.vx + k2_vx/2], self.vy_history + [self.vy + k2_vy/2],
                                   self.mass, self.charge)
-        # fx, fy = self.forces_func(self.x + k2_x/2, self.y + k2_y/2,
-        #                          self.vx + k2_vx/2, self.vy + k2_vy/2,
-        #                          self.mass, self.charge)
         ax, ay = self.force_to_acceleration(self.vx + k2_vx/2, self.vy + k2_vy/2, self.mass, fx, fy)
         k3_x = self.base_dt * (self.vx + k2_vx / 2)
         k3_y = self.base_dt * (self.vy + k2_vy / 2)
@@ -240,9 +237,6 @@ class Simulation:
                                   self.x_history + [self.x + k3_x], self.y_history + [self.y + k3_y],
                                   self.vx_history + [self.vx + k3_vx], self.vy_history + [self.vy + k3_vy],
                                   self.mass, self.charge)
-        # fx, fy = self.forces_func(self.x + k3_x, self.y + k3_y,
-        #                          self.vx + k3_vx, self.vy + k3_vy,
-        #                          self.mass, self.charge)
         ax, ay = self.force_to_acceleration(self.vx + k3_x, self.vy + k3_vy, self.mass, fx, fy)
         k4_x = self.base_dt * (self.vx + k3_vx)
         k4_y = self.base_dt * (self.vy + k3_vy)
@@ -380,7 +374,7 @@ class Simulation:
         for i, (px, py) in enumerate(zip(x, y)):
             # Don't draw polygon points as a particle
             if i not in polygon_points:
-                # Default color: red
+                # Default color: red.  Positive charges are drawn in light green.
                 if self.charge[i] > 0.0:
                     color = np.array((128, 255, 128))
                 else:
@@ -615,12 +609,6 @@ class Simulation:
 
         # Mark the origin
         ax.scatter((0.0,), (0.0,), color="red")
-
-        # Plot the light cone
-        x_range, y_range = np.meshgrid(np.linspace(np.min(x_positions), np.max(x_positions), 10),
-                                       np.linspace(np.min(y_positions), np.max(y_positions), 10))
-        z_cone = np.sqrt(x_range**2 + y_range**2) / self.c
-        #ax.plot_wireframe(x_range, y_range, z_cone, edgecolor='green')
 
         # Configure the plot
         ax.set_xlabel('X-Position')
