@@ -73,27 +73,28 @@ class Simulation:
         return self.x_history[0].shape[0]
 
     def _default_force_func(self, *args):
-        """Calculates the forces acting on particles in the absence of forces.  The default behavior."""
+        """Calculates the forces acting on particles in the absence of forces.  This is the default behavior."""
         return np.zeros(self.object_count), np.zeros(self.object_count)
 
-    def basic_random_start(self, x_range: tuple, y_range: tuple, vx_range: tuple, vy_range: tuple, q_range: tuple, max_m: float, object_count: int):
-        """Randomly populates the simulation with a collection of points.
-        Note: this will erase any currently stored points"""
+    def basic_random_start(self, x_range: Tuple[float, float], y_range: Tuple[float, float],
+                           vx_range: Tuple[float, float], vy_range: Tuple[float, float], q_range: Tuple[float, float],
+                           max_m: float, object_count: int):
+        """Randomly populates the simulation with a collection of points."""
         # Randomly generate positions
-        self.x = (x_range[1]-x_range[0]) * np.random.rand(object_count) + x_range[0]
-        self.y = (y_range[1]-y_range[0]) * np.random.rand(object_count) + y_range[0]
+        self.x = np.append(self.x, (x_range[1]-x_range[0]) * np.random.rand(object_count) + x_range[0])
+        self.y = np.append(self.y, (y_range[1]-y_range[0]) * np.random.rand(object_count) + y_range[0])
 
         # Randomly generate velocities
-        self.vx = (vx_range[1]-vx_range[0]) * np.random.rand(object_count) + vx_range[0]
-        self.vy = (vy_range[1]-vy_range[0]) * np.random.rand(object_count) + vy_range[0]
+        self.vx = np.append(self.vx, (vx_range[1]-vx_range[0]) * np.random.rand(object_count) + vx_range[0])
+        self.vy = np.append(self.vy, (vy_range[1]-vy_range[0]) * np.random.rand(object_count) + vy_range[0])
 
         # Randomly generate particle attributes
-        self.mass = max_m * np.random.rand(object_count)
-        self.charge = (q_range[1]-q_range[0]) * np.random.rand(object_count) + q_range[0]
+        self.mass = np.append(self.mass, max_m * np.random.rand(object_count))
+        self.charge = np.append(self.charge, (q_range[1]-q_range[0]) * np.random.rand(object_count) + q_range[0])
 
         # Build force arrays
-        self.Fx = np.zeros(object_count)
-        self.Fy = np.zeros(object_count)
+        self.Fx = np.append(self.Fx, np.zeros(object_count))
+        self.Fy = np.append(self.Fy, np.zeros(object_count))
 
     def add_point(self, x: float, y: float, vx: float, vy: float, mass: float, charge: float):
         """Adds a point-mass to the system"""
@@ -347,7 +348,7 @@ class Simulation:
         # Find the positions of everything in the object's present
         present_time = frame_t_prime
         time_diff = np.abs(t_history_prime - present_time)
-        other_present_index = time_diff.argmin(axis=0)
+        other_present_index = np.nanargmin(time_diff, axis=0)
 
         current_x = x_history_prime[other_present_index, np.arange(x_history_prime.shape[1])]
         current_y = y_history_prime[other_present_index, np.arange(y_history_prime.shape[1])]
@@ -383,7 +384,10 @@ class Simulation:
             # Don't draw polygon points as a particle
             if i not in polygon_points:
                 # Default color: red
-                color = np.array((255, 0, 0))
+                if self.charge[i] > 0.0:
+                    color = np.array((128, 255, 128))
+                else:
+                    color = np.array((255, 0, 0))
 
                 # Mouse hovering over particle: aqua
                 if i == nearest_index:
@@ -555,7 +559,6 @@ class Simulation:
 
                         # Select the nearest point
                         nearest_index = np.argmin(distance_squared)
-
                         # Only switch frames if the nearest point is near enough (within 1 visual radius)
                         if distance_squared[nearest_index] < 10**2:
                             # Check to make sure the target object is not at (or exceeding?) the speed of light
@@ -634,7 +637,7 @@ class Simulation:
         # Show the plot
         plt.show()
 
-    def save(self, file_name: str):
+    def save(self, file_name: str, compressed: bool = True):
         """Saves simulation results to a .csv file"""
         # Put the data into a pandas data-frame
         # Convert histories into a 1D array for the purposes of saving
@@ -651,12 +654,18 @@ class Simulation:
                                    "Parameters"])
 
         # Save to file
-        data.to_csv(file_name)
+        if compressed:
+            data.to_csv(file_name, compression="gzip")
+        else:
+            data.to_csv(file_name)
 
-    def load(self, file_name: str):
+    def load(self, file_name: str, compressed: bool = True):
         """Loads simulation data from a .csv file"""
         # Load data-frame from file
-        data = pd.read_csv(file_name, index_col=0)
+        if compressed:
+            data = pd.read_csv(file_name, index_col=0, compression="gzip")
+        else:
+            data = pd.read_csv(file_name, index_col=0)
 
         # Obtain size to reshape to history arrays to
         time_length, object_count = int(data.loc["Parameters"][1]), int(data.loc["Parameters"][2])
@@ -675,31 +684,31 @@ class Simulation:
 # Main program
 def main():
     # Test 1: Random particles
-    # test1()
+    test1()
 
     # Test 2: Polygon
     # test2()
 
-    # Test 3: Motionless random particles
+    # Test 3: Barn and ladder
     # test3()
 
-    # Test 4: Barn and ladder
+    # Test 4: Constant force
     # test4()
 
-    # Test 5: Constant force
+    # Test 4.1: Gradually decreasing force
+    # test4_1()
+
+    # Test 5: Electrostatic force
     # test5()
 
-    # Test 5.1: Gradually decreasing force
+    # Test 5.1: Electrostatic force loaded from a file
     # test5_1()
 
-    # Test 6: Electrostatic force
+    # Test 6: Moving particle next to line of charge
     # test6()
 
-    # Test 6.1: Electrostatic force loaded from a file
-    test6_1()
-
-    # Test 7: Moving line of charge
-    # test7()
+    # Test 6.1: Moving particle next to line of charge loaded from a file
+    # test6_1()
 
 
 def test1():
@@ -743,28 +752,6 @@ def test2():
 
 
 def test3():
-    """Test a random start, no motion"""
-    # Declare simulation
-    sim = Simulation(0.1, 100)
-
-    # Add particles
-    sim.basic_random_start((-20.0, 20.0), (-20.0, 20.0),
-                           (0.0, 0.0), (0.0, 0.0),
-                           (0.0, 0.0),
-                           1.0,
-                           10)
-
-    # Run the simulation
-    sim.run()
-
-    # Show the simulation
-    sim.show()
-
-    # Plot the simulation
-    sim.plot()
-
-
-def test4():
     """Test the barn-and-ladder paradox"""
     # Declare simulation
     sim = Simulation(0.01, 50)
@@ -776,7 +763,7 @@ def test4():
     sim.add_polygon([0, 0, 101, 101, 0, 0, 100, 100], [100, 101, 101, 0, 0, 1, 1, 100], 50, 50, 0.0, 0.0)
 
     # Add "ladder"
-    sim.add_polygon([0, 25, 50, 50, 0], [0, 0, 0, 1, 1], -100, 100, 9.0, 0.0)
+    sim.add_polygon([0, 50, 100, 100, 0], [0, 0, 0, 1, 1], -100, 100, 9.0, 0.0)
 
     # Run simulation
     sim.run()
@@ -788,7 +775,7 @@ def test4():
     sim.show(t_stop=15.24)
 
 
-def test5():
+def test4():
     """Acceleration of a particle due to a constant force to the right"""
     # Build function for forces
     def forces(t, x, y, vx, vy, mass, charge):
@@ -822,13 +809,18 @@ def test5():
     sim.run(method='rk4')
 
     # Show the results
-    sim.show()
+    #sim.show()
 
     # Show a plot of the results
-    sim.plot()
+    # sim.plot()
+    sim.plot(0)
+    # sim.plot(1)
+    sim.plot(2)
+    sim.plot(3)
+    sim.plot(4)
 
 
-def test5_1():
+def test4_1():
     """Acceleration of a particle due to a decreasing force to the right"""
     # Build function for forces
     def forces(t, x, y, vx, vy, mass, charge):
@@ -868,7 +860,7 @@ def test5_1():
     sim.plot()
 
 
-def test6():
+def test5():
     """Full, non-instantaneous electrostatic forces"""
     # Declare function for the forces
     def forces(t, x, y, vx, vy, mass, charge):
@@ -918,7 +910,7 @@ def test6():
             distance = np.sqrt(delta_x ** 2 + delta_y ** 2)
 
             # Compute the magnitude of the force
-            f = charge[i] * other_charges[valid] / (4 * np.pi * epsilon_0 * distance[valid] ** 2)
+            f = -charge[i] * other_charges[valid] / (4 * np.pi * epsilon_0 * distance[valid] ** 2)
 
             # Break the force into components and add to net force
             fx[i] = np.sum(f * delta_x[valid] / distance[valid])
@@ -947,24 +939,24 @@ def test6():
     sim.plot()
 
     # Save the results to a file
-    sim.save("Electrostatic Simulation 2.csv")
+    sim.save("Electrostatic Simulation.gz")
 
 
-def test6_1():
+def test5_1():
     """Full, non-instantaneous electrostatic forces"""
     # Declare the simulation
     sim = Simulation(1.0, 1.0)
 
     # Load simulation data from a file
-    sim.load("Electrostatic Simulation 2.csv")
+    sim.load("Electrostatic Simulation.gz")
 
     # Show the simulation
-    #sim.show()
-    sim.plot(5, x_lim=(-100, 100), y_lim=(-100, 100), t_lim=(-10, 10))
+    sim.show()
 
 
-def test7():
-    """A moving line of charge with non-instantaneous forces"""
+def test6():
+    """A moving line of charge with non-instantaneous forces.  All charges in the wire are idealized so that they feel
+    no forces."""
     # Declare function for the forces
     def forces(t, x, y, vx, vy, mass, charge):
         """t, x, y, vx and vy are the entire histories of simulation thus far"""
@@ -979,7 +971,15 @@ def test7():
 
         present_time = t[-1]
 
+        # Wait for a bit before calling in forces
+        if present_time < 5.0:
+            return fx, fy
+
         for i, (xi, yi) in enumerate(zip(x[-1], y[-1])):
+            # All charges in the wire are idealized to feel no force.  So, skip calculating any forces for them
+            if i in range(100):
+                continue
+
             # Get the histories with the exception of this object's
             other_x_histories = np.delete(x_histories, i, axis=0)
             other_y_histories = np.delete(y_histories, i, axis=0)
@@ -1014,7 +1014,7 @@ def test7():
             distance = np.sqrt(delta_x ** 2 + delta_y ** 2)
 
             # Compute the magnitude of the force
-            f = charge[i] * other_charges[valid] / (4 * np.pi * epsilon_0 * distance[valid] ** 2)
+            f = -charge[i] * other_charges[valid] / (4 * np.pi * epsilon_0 * distance[valid] ** 2)
 
             # Break the force into components and add to net force
             fx[i] = np.sum(f * delta_x[valid] / distance[valid])
@@ -1026,17 +1026,52 @@ def test7():
     # Declare simulation
     sim = Simulation(0.01, 20, forces, c=20.0)
 
-    # Spawn line of moving charge
-    for x_pos in np.linspace(-500.0, 500.0, 15):
-        sim.add_point(x_pos, -50.0, 0.9*sim.c, 0.0, 1.0, -1.0)
+    # Take the frame of the particle that is moving near the wire.
+    # This will require calculating the length contraction of the particles
+    drift_velocity = 0.5 * sim.c
+    drift_gamma = 1 / np.sqrt(1-drift_velocity**2 / sim.c**2)
+    primed_span = 700
+    positive_charge_span = primed_span / drift_gamma
+    negative_charge_span = primed_span * drift_gamma
+
+    # Spawn line of stationary negative charges
+    for x_pos in np.linspace(-negative_charge_span, negative_charge_span, 50):
+        sim.add_point(x_pos, -20.0, 0.0, 0.0, 1.0, -1.0)
+
+    # Spawn line of moving positive charges
+    for x_pos in np.linspace(-positive_charge_span, positive_charge_span, 50):
+        sim.add_point(x_pos, -20.0, -drift_velocity, 0.0, 1.0, 1.0)
+
+    print(sim.x.shape)
+
+    # Spawn observational point
+    sim.add_point(-20.0, 50.0, -drift_velocity, 0.0, 1.0, 0.0)
 
     # Spawn test charge near the line
-    sim.add_point(0.0, 50.0, 0.0, 0.0, 1.0, -1.0)
+    sim.add_point(10.0, 50.0, 0.0, 0.0, 0.1, 1.0)
 
     # Run the simulation
     sim.run(print_progress=True)
 
+    # Save this simulation to a file
+    sim.save("Line of Charge Simulation.gz")
+
     # Show the results
+    sim.show()
+
+    # Show a plot of the results
+    sim.plot()
+
+
+def test6_1():
+    """Same as test6, except loaded from a file to save time"""
+    # Declare simulation
+    sim = Simulation(0.01, 30)
+
+    # Load simulation data from file
+    sim.load("Line of Charge Simulation.gz")
+
+    # Show the results of the simulation
     sim.show()
 
     # Show a plot of the results
