@@ -33,13 +33,16 @@ simulations include:
   are shown completely incorrectly.
 * Electrostatic force test: A test of electrostatic force where the forces propagate 
   at the speed of light.  As a result, particles in the simulation initially remain 
-  motionless, until the forces have had enough time to reach them.
+  motionless, until the forces have had enough time to reach them.  Since this 
+  simulation is relatively slow, the example code will load pre-computed results from 
+  `Electrostatic Simulation.gz`.
 * Moving line of charge: A moving line of charge is placed next to charged particle.  
   This simulation demonstrates the relationship between electricity and magnetism.  
   In one reference frame, the force appears electrostatic due to a net positive 
   charge.  In another frame, the force appears to be magnetic due to a current of 
   moving charges.  This is despite the simulation code only calculating an 
-  electrostatic force.
+  electrostatic force.  Since this simulation is relatively slow, the example code 
+  will load pre-computed results from `Line of Charge Simulation.gz`.
 
 ---
 
@@ -61,10 +64,10 @@ simulation.  The controls for it are as follows:
 
 The following requirements are needed in order to run the program:
 
-| Name       | Version                                 |
-| ---------- | --------------------------------------- |
-| Python     |  >3.8                                   |
-| Pygame     |  Written with 1.9.6, others likely work |
-| Numpy      |   Any                                   |
-| Matplotlib |   Any                                   |
-| Pandas     |   Any                                   |
+| Name       | Version                                            |
+| ---------- | -------------------------------------------------- |
+| Python     |  >3.8                                              |
+| Pygame     |  Originally written with 1.9.6, others likely work |
+| Numpy      |  Any                                               |
+| Matplotlib |  Any                                               |
+| Pandas     |  Any                                               |
